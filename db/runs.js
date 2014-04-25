@@ -2,20 +2,20 @@
 
 module.exports = function(sequelize, DataTypes) {
   return sequelize.define('runs', {
-    workerid: {
+    workerId: {
       type: DataTypes.STRING,
       allowNull: false,
       primaryKey: true
     },
-    workergroup: {
+    workerGroup: {
       type: DataTypes.STRING,
       allowNull: false,
     },
-    runid: {
+    runId: {
       type: DataTypes.INTEGER,
       allowNull: false,
     },
-    taskid: {
+    taskId: {
       type: 'UUID',
       allowNull: false,
     }

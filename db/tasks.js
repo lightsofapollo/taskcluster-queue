@@ -1,8 +1,10 @@
 /* jshint indent: 2 */
 
+var slugid = require('slugid');
+
 module.exports = function(sequelize, DataTypes) {
-  return sequelize.define('tasks', {
-    takenuntil: {
+  var TYPES = {
+    takenUntil: {
       type: DataTypes.DATE,
       allowNull: false,
     },
@@ -38,18 +40,32 @@ module.exports = function(sequelize, DataTypes) {
       type: DataTypes.STRING,
       allowNull: false,
     },
-    workertype: {
+    workerType: {
       type: DataTypes.STRING,
       allowNull: false,
     },
-    provisionerid: {
+    provisionerId: {
       type: DataTypes.STRING,
       allowNull: false,
     },
-    taskid: {
+    taskId: {
       type: 'UUID',
       allowNull: false,
       primaryKey: true
+    }
+  };
+
+  return sequelize.define('tasks', TYPES, {
+    getterMethods: {
+      taskIdSlug: function() {
+        return slugid.encode(this.taskId);
+      },
+    },
+
+    setterMethods: {
+      taskIdSlug: function(slug) {
+        this.taskId = slugid.decode(slug);
+      }
     }
   });
 };
