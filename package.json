@@ -1,4 +1,4 @@
-{
+
   "name": "taskcluster-queue",
   "version": "0.1.0",
   "private": true,
@@ -31,8 +31,6 @@
     "mkdirp": "0.3.5",
     "superagent": "0.16.0",
     "superagent-promise": "0.1.0",
-    "sequelize": "~2.0.0-dev11",
-    "dsn": "~1.0.1",
     "url-join": "0.0.1",
     "slugid": "~1.0.1"
   },

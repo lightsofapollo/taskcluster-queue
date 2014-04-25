@@ -7,12 +7,12 @@ module.exports = function connect(sequelize) {
   var Tasks = sequelize.import(__dirname + '/db/tasks');
 
   Runs.belongsTo(Tasks, {
-    foreignKey: 'taskid',
+    foreignKey: 'taskId',
     onDelete: 'cascade'
   });
 
   Tasks.hasMany(Runs, {
-    foreignKey: 'taskid'
+    foreignKey: 'taskId'
   });
 
   return {
