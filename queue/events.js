@@ -102,23 +102,21 @@ exports.publish = function(exchange, message) {
 
   return new Promise(function(accept, reject) {
     // Check if we're supposed to validate out-going messages
-    if (nconf.get('queue:validateOutgoing')) {
-      var schema = 'http://schemas.taskcluster.net/queue/v1/' + exchange +
-                   '-message.json#';
-      debug('Validating with schema', schema);
+    var schema = 'http://schemas.taskcluster.net/queue/v1/' + exchange +
+                 '-message.json#';
+    debug('Validating with schema', schema);
 
-      var errors = validate(message, schema);
-      // Reject message if there's any errors
-      if (errors) {
-        debug(
-          "Failed to publish message, errors: %s, as JSON: %j",
-          errors,
-          errors
-        );
-        debug("Message: %j", message);
-        reject(errors);
-        return;
-      }
+    var errors = validate(message, schema);
+    // Reject message if there's any errors
+    if (errors) {
+      debug(
+        "Failed to publish message, errors: %s, as JSON: %j",
+        errors,
+        errors
+      );
+      debug("Message: %j", message);
+      reject(errors);
+      return;
     }
 
     // Construct routing key from task status structure in message

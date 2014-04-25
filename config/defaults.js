@@ -16,11 +16,7 @@ module.exports = {
     // Publish schemas to bucket on startup, this should default to false, only
     // do this in the actual production server... Hence, set it by environment
     // variable. Unset it `inorder` to set it false by environment variable.
-    publishSchemas:                 false,
-
-    // Validate out-going messages, this can be disabled if we trust that we
-    // generate correct JSON internally and want more performance
-    validateOutgoing:               true
+    publishSchemas:                 false
   },
 
   // Server (HTTP) configuration
