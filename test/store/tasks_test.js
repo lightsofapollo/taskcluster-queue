@@ -193,5 +193,37 @@ suite('tasks', function() {
       });
     });
 
+    suite('#rerunTask', function() {
+      var task;
+      setup(function() {
+        task = taskFactory();
+        task.state = 'running';
+        return Tasks.create(task);
+      });
+
+      test('without a completed task', function() {
+        return Tasks.rerunTask(task.taskId, 22).then(function(record) {
+          assert.ok(!record, 'no task was updated for rerun');
+        });
+      });
+
+      test('with a completed task', function() {
+        var rerunTask;
+
+        return Tasks.completeTask(task.taskId).then(function() {
+          return Tasks.rerunTask(task.taskId, 22);
+        }).then(function(value) {
+          rerunTask = value;
+          return Tasks.findBySlugWithRuns(task.taskId);
+        }).then(function(record) {
+          // returns the rerun task
+          assert.deepEqual(rerunTask, record);
+
+          assert.deepEqual(record.takenUntil, new Date(0));
+          assert.equal(record.retries, 22);
+        });
+      });
+    });
+
   });
 });

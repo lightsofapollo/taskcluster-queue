@@ -194,6 +194,27 @@ module.exports = mem(function(knex) {
       return taskJoinQuery().
         where(query).
         then(outgoingTasks);
-    }
+    },
+
+    rerunTask: decorateDecodeSlug(function(taskId, retries) {
+      return knex('tasks').
+        update({
+          state: 'pending',
+          reason: 'rerun-requested',
+          retries: retries,
+          takenUntil: new Date(0), // reset taken until
+        }).
+        where('taskId', taskId).
+        andWhere(function() {
+          this.
+            where('state', 'completed').
+            orWhere('state', 'failed');
+        }).
+        then(function(count) {
+          if (!count) return null;
+          // yuck!
+          return this.findBySlugWithRuns(slugid.encode(taskId));
+        }.bind(this));
+    })
   };
 });
