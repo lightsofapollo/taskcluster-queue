@@ -96,6 +96,12 @@ function first(rows) {
 
 
 module.exports = mem(function(knex) {
+  function taskJoinQuery() {
+    return knex('tasks').
+      select('*', 'tasks.taskId as taskId').
+      join('runs', 'tasks.taskId', '=', 'runs.taskId', 'left outer');
+  }
+
   return {
     create: function(task) {
       return knex('tasks').insert(incomingTask(task));
@@ -114,9 +120,7 @@ module.exports = mem(function(knex) {
     }),
 
     findBySlugWithRuns: decorateDecodeSlug(function(taskId) {
-      return knex('tasks').
-        options({ nestTables: true }).
-        join('runs', 'tasks.taskId', '=', 'runs.taskId', 'left outer').
+      return taskJoinQuery().
         where('tasks.taskId', taskId).
         then(outgoingTasks).
         then(first);
@@ -174,7 +178,22 @@ module.exports = mem(function(knex) {
         });
       }).
       then(first);
-    })
+    }),
 
+    completeTask: decorateDecodeSlug(function(taskId) {
+      return knex('tasks').
+        update({ state: 'completed' }).
+        where('taskId', taskId).
+        andWhere('state', 'running').
+        then(function(count) {
+          return count !== 0;
+        });
+    }),
+
+    findAllWithRuns: function(query) {
+      return taskJoinQuery().
+        where(query).
+        then(outgoingTasks);
+    }
   };
 });

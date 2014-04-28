@@ -1,11 +1,12 @@
 suite('tasks', function() {
+  var Promise = require('promise');
   var slugid = require('slugid');
   var assert = require('assert');
   var Tasks;
   var testDb = require('../db');
   var knex;
 
-  function taskFactory() {
+  function taskFactory(overrides) {
     return {
       "taskId":             slugid.v4(),
       "provisionerId":      "jonasfj-test-provid",
@@ -103,5 +104,94 @@ suite('tasks', function() {
           assert.deepEqual(task, taskWithRuns);
         });
     });
+  });
+
+  suite('#completeTask', function() {
+    var task;
+
+    test('does not mark pending task', function() {
+      var task = taskFactory();
+      return Tasks.create(task).
+        then(function() {
+          return Tasks.completeTask(task.taskId);
+        }).
+        then(function(completed) {
+          assert.ok(!completed);
+          return Tasks.findBySlug(task.taskId);
+        }).
+        then(function(record) {
+          assert.equal(record.state, task.state);
+        });
+    });
+
+    test('marks running task complete', function() {
+      var task = taskFactory();
+      task.state = 'running';
+      return Tasks.create(task).
+        then(function() {
+          return Tasks.completeTask(task.taskId);
+        }).
+        then(function(completed) {
+          assert.ok(completed);
+          return Tasks.findBySlug(task.taskId);
+        }).
+        then(function(record) {
+          assert.equal(record.state, 'completed');
+        });
+    });
+  });
+
+  suite('#findAllPendingByRun', function() {
+    function mapByTaskId(list) {
+      return list.reduce(function(result, row) {
+        result[row.taskId] = row;
+        return result;
+      }, {});
+    }
+
+    var taskFoo;
+    setup(function() {
+      taskFoo = taskFactory();
+      taskFoo.provisionerId = 'foo';
+      taskFoo.workerType = 'type';
+      return Tasks.create(taskFoo).then(function() {
+        return Tasks.claim(taskFoo.taskId, new Date(), runFactory());
+      });
+    });
+
+    var taskBar;
+    setup(function() {
+      taskBar = taskFactory();
+      taskBar.provisionerId = 'bar';
+      taskBar.workerType = 'type';
+      return Tasks.create(taskBar);
+    });
+
+    test('single result', function() {
+      return Tasks.findAllWithRuns({
+        provisionerId: 'bar'
+      }).then(function(records) {
+        assert.deepEqual(records[0], taskBar);
+      });
+    });
+
+    test('find multiple', function() {
+      return Tasks.findAllWithRuns({
+        workerType: 'type'
+      }).then(function(records) {
+        var byId = mapByTaskId(records);
+
+        return Promise.all([
+          Tasks.findBySlugWithRuns(taskFoo.taskId),
+          Tasks.findBySlugWithRuns(taskBar.taskId)
+        ]).then(function(list) {
+          assert.deepEqual(
+            byId,
+            mapByTaskId(list)
+          );
+        });
+      });
+    });
+
   });
 });
