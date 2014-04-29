@@ -1,6 +1,6 @@
 var knex = require('knex');
 var schema = require('../store/schema');
-var config = require('../config/tests')();
+var config = require('../config/test')();
 
 module.exports = function connect() {
   var db = knex.initialize({

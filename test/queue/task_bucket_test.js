@@ -3,7 +3,7 @@ suite('task bucket', function() {
   var AWS = require('aws-sdk-promise');
 
   var assert = require('assert');
-  var config = require('../../config/tests')();
+  var config = require('../../config/test')();
   var s3 = new AWS.S3(config.get('aws'));
   var slugid = require('slugid');
 

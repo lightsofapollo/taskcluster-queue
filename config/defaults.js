@@ -35,7 +35,7 @@ module.exports = {
   // Database configuration
   database: {
     // Database connection string as anything://user:password@host:port/database
-    connectionString:               'pg://queue:secret@localhost:5432/queue_v1',
+    connectionString:               'postgres://queue:secret@localhost:5432/queue_v1',
 
     // Drop database table if they already exist, this is mainly useful for
     // debugging when given as command-line argument: --database:dropTables
