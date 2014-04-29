@@ -1,6 +1,8 @@
 module.exports = {
   // TaskCluster Queue configuration
   queue: {
+    reaperInterval: 1000 * 15,
+
     // Name of S3 bucket where all task and artifacts will be stored
     taskBucket:                     'tasks.taskcluster.net',
 
