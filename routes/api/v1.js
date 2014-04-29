@@ -2,7 +2,6 @@ var nconf     = require('nconf');
 var utils     = require('./utils');
 var Promise   = require('promise');
 var aws       = require('aws-sdk-promise');
-var _         = require('lodash');
 var debug     = require('debug')('routes:api:0.2.0');
 var slugid    = require('../../utils/slugid');
 var validate  = require('../../utils/validate');
@@ -453,10 +452,10 @@ api.declare({
   var taskId        = req.params.taskId;
   var runId         = req.body.runId;
   var artifacts     = req.body.artifacts;
-  var artifact_list = _.keys(artifacts);
+  var artifact_list = Object.keys(artifacts);
 
   // Load task
-  var task_loaded = data.loadTask(taskId)
+  var task_loaded = data.loadTask(taskId);
 
   // Let urls timeout after 20 min
   var timeout = 20 * 60;
@@ -895,4 +894,3 @@ api.declare({
     url:  nconf.get('amqp:url')
   });
 });
-
