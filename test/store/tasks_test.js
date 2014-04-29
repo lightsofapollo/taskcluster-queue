@@ -6,6 +6,13 @@ suite('tasks', function() {
   var testDb = require('../db');
   var knex;
 
+  function mapByTaskId(list) {
+    return list.reduce(function(result, row) {
+      result[row.taskId] = row;
+      return result;
+    }, {});
+  }
+
   function taskFactory(overrides) {
     return {
       "taskId":             slugid.v4(),
@@ -18,7 +25,7 @@ suite('tasks', function() {
       "timeout":            60,
       "priority":           2.6,
       "created":            new Date("2014-02-01T03:22:36.356Z"),
-      "deadline":           new Date("2014-03-01T03:22:36.356Z"),
+      "deadline":           new Date("2034-03-01T03:22:36.356Z"),
       "takenUntil":         new Date("1970-01-01T00:00:00.000Z")
     };
   }
@@ -83,8 +90,9 @@ suite('tasks', function() {
     });
 
     test('create first run and claim', function() {
+      var takenUntil = new Date(2020);
       var run = runFactory();
-      return Tasks.claim(task.taskId, new Date(), run).
+      return Tasks.claim(task.taskId, takenUntil, run).
         then(function(runId) {
           assert.equal(runId, 1);
           return Tasks.findBySlugWithRuns(task.taskId);
@@ -100,6 +108,7 @@ suite('tasks', function() {
 
           task.retries--;
           task.state = 'running';
+          task.takenUntil = takenUntil;
 
           assert.deepEqual(task, taskWithRuns);
         });
@@ -142,13 +151,6 @@ suite('tasks', function() {
   });
 
   suite('#findAllPendingByRun', function() {
-    function mapByTaskId(list) {
-      return list.reduce(function(result, row) {
-        result[row.taskId] = row;
-        return result;
-      }, {});
-    }
-
     var taskFoo;
     setup(function() {
       taskFoo = taskFactory();
@@ -224,6 +226,75 @@ suite('tasks', function() {
         });
       });
     });
+  });
 
+  suite('#findAndUpdateFailed', function() {
+    var deadlineTask;
+    var retriesTask;
+
+    setup(function() {
+      deadlineTask = taskFactory();
+      deadlineTask.state = 'running';
+      deadlineTask.deadline = new Date(0);
+      deadlineTask.takenUntil = new Date(2030);
+
+      return Tasks.create(deadlineTask);
+    });
+
+    setup(function() {
+      retriesTask = taskFactory();
+      retriesTask.state = 'running';
+      retriesTask.retries = 0;
+      retriesTask.takenUntil = new Date(0);
+
+      return Tasks.create(retriesTask);
+    });
+
+    test('expire exhausted retries and deadline expiries', function() {
+      function taskIdsOnly(list) {
+        return list.
+          map(function(row) {
+            return row.taskId;
+          }).
+          sort();
+      }
+
+      return Tasks.findAndUpdateFailed().
+        then(function(tasks) {
+          assert.deepEqual(
+            taskIdsOnly(tasks),
+            taskIdsOnly([retriesTask, deadlineTask])
+          );
+
+          return Tasks.findAllWithRuns({ state: 'failed' });
+        }).
+        then(function(tasks) {
+          var tasksById = mapByTaskId(tasks);
+          var deadlinedRecord = tasksById[deadlineTask.taskId];
+          var retriesRecord = tasksById[retriesTask.taskId];
+
+          assert.equal(deadlinedRecord.state, 'failed');
+          assert.equal(retriesRecord.state, 'failed');
+          assert.equal(deadlinedRecord.reason, 'deadline-exceeded');
+          assert.equal(retriesRecord.reason, 'retries-exhausted');
+        });
+    });
+  });
+
+  suite('#findAndUpdatePending', function() {
+    test('with expired', function() {
+      var task = taskFactory();
+      task.retries = 10;
+      return Tasks.create(task).
+        then(function() {
+          return Tasks.claim(task.taskId, new Date(0), runFactory());
+        }).
+        then(function() {
+          return Tasks.findAndUpdatePending();
+        }).
+        then(function(rows) {
+          assert.equal(rows[0].taskId, task.taskId);
+        });
+    });
   });
 });

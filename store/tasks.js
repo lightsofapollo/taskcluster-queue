@@ -1,6 +1,5 @@
 var mem = require('memoizee');
 var slugid = require('slugid');
-var _ = require('lodash');
 var Promise = require('promise');
 
 var TASK_FIELDS = [
@@ -99,7 +98,19 @@ module.exports = mem(function(knex) {
   function taskJoinQuery() {
     return knex('tasks').
       select('*', 'tasks.taskId as taskId').
-      join('runs', 'tasks.taskId', '=', 'runs.taskId', 'left outer');
+      join('runs', 'tasks.taskId', '=', 'runs.taskId', 'left outer').
+      // correctly order runs so the array comes out in the correct order.
+      orderBy('runs.runId');
+  }
+
+  function findAllByTaskId(taskIds) {
+    if (!taskIds.length) {
+      return [];
+    }
+
+    return taskJoinQuery().
+      whereIn('tasks.taskId', taskIds).
+      then(outgoingTasks);
   }
 
   return {
@@ -148,6 +159,7 @@ module.exports = mem(function(knex) {
         var markRunning = knex('tasks').
           transacting(t).
           update({
+            takenUntil: takenUntil,
             retries: knex.raw('"retries" - 1'),
             state: 'running'
           }).
@@ -215,6 +227,57 @@ module.exports = mem(function(knex) {
           // yuck!
           return this.findBySlugWithRuns(slugid.encode(taskId));
         }.bind(this));
-    })
+    }),
+
+    findAndUpdateFailed: function() {
+      var deadlineExpire = knex('tasks').
+        update({
+          state: 'failed',
+          reason: 'deadline-exceeded'
+        }).
+        where('deadline', '<', new Date()).
+        andWhere(function() {
+          this.
+            where('state', 'pending').
+            orWhere('state', 'running');
+        }).
+        returning('taskId');
+
+      var retiresExhausted = knex('tasks').
+        update({
+          state: 'failed',
+          reason: 'retries-exhausted'
+        }).
+        where({
+          state: 'running',
+          retries: 0
+        }).
+        andWhere(
+          'takenUntil',
+          '<',
+          new Date()
+        ).
+        returning('taskId');
+
+      return Promise.all([deadlineExpire, retiresExhausted]).
+        then(function(records) {
+          return records.reduce(function(list, taskIds) {
+            return list.concat(taskIds);
+          }, []);
+        }).
+        then(findAllByTaskId);
+    },
+
+    findAndUpdatePending: function() {
+      return knex('tasks').
+        update({
+          state: 'pending'
+        }).
+        where('takenUntil', '<', new Date()).
+        andWhere('state', 'running').
+        andWhere('retries', '>', 0).
+        returning('taskId').
+        then(findAllByTaskId);
+    }
   };
 });
