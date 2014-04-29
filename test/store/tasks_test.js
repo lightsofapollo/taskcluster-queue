@@ -90,7 +90,7 @@ suite('tasks', function() {
     });
 
     test('create first run and claim', function() {
-      var takenUntil = new Date(2020);
+      var takenUntil = new Date(2020, 1);
       var run = runFactory();
       return Tasks.claim(task.taskId, takenUntil, run).
         then(function(runId) {
@@ -236,7 +236,7 @@ suite('tasks', function() {
       deadlineTask = taskFactory();
       deadlineTask.state = 'running';
       deadlineTask.deadline = new Date(0);
-      deadlineTask.takenUntil = new Date(2030);
+      deadlineTask.takenUntil = new Date(2030, 1);
 
       return Tasks.create(deadlineTask);
     });
