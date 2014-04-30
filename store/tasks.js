@@ -17,6 +17,12 @@ var TASK_FIELDS = [
   'takenUntil'
 ];
 
+var JSONIFY_PROPS = [
+  'created',
+  'deadline',
+  'takenUntil'
+];
+
 var RUN_FIELDS = [
   'runId',
   'workerGroup',
@@ -45,6 +51,11 @@ function mapTask(taskId, row) {
     model[key] = row[key];
     return model;
   }, {});
+
+  JSONIFY_PROPS.forEach(function(key) {
+    record[key] = record[key].toJSON();
+  });
+
   record.taskId = taskId;
   record.runs = [];
   return record;

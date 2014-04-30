@@ -25,9 +25,9 @@ suite('tasks', function() {
       "retries":            0,
       "timeout":            60,
       "priority":           2.6,
-      "created":            new Date("2014-02-01T03:22:36.356Z"),
-      "deadline":           new Date("2034-03-01T03:22:36.356Z"),
-      "takenUntil":         new Date("1970-01-01T00:00:00.000Z")
+      "created":            "2014-02-01T03:22:36.356Z",
+      "deadline":           "2034-03-01T03:22:36.356Z",
+      "takenUntil":         "1970-01-01T00:00:00.000Z"
     };
   }
 
@@ -69,7 +69,7 @@ suite('tasks', function() {
         update({ state: 'running' }).
         where('taskId', slugid.decode(task.taskId)).
         then(function() {
-          return Tasks.claim(task.taskId, new Date(), {});
+          return Tasks.claim(task.taskId, new Date().toJSON(), {});
         }).then(function(taskId) {
           assert.equal(taskId, null);
         });
@@ -86,7 +86,7 @@ suite('tasks', function() {
       }).then(function(result) {
         return Tasks.findBySlug(task.taskId);
       }).then(function(updatedTask) {
-        assert.deepEqual(updatedTask.takenUntil, reclaimDate);
+        assert.deepEqual(updatedTask.takenUntil, reclaimDate.toJSON());
       });
     });
 
@@ -109,7 +109,7 @@ suite('tasks', function() {
 
           task.retries--;
           task.state = 'running';
-          task.takenUntil = takenUntil;
+          task.takenUntil = takenUntil.toJSON();
 
           assert.deepEqual(task, taskWithRuns);
         });
@@ -222,7 +222,7 @@ suite('tasks', function() {
           // returns the rerun task
           assert.deepEqual(rerunTask, record);
 
-          assert.deepEqual(record.takenUntil, new Date(0));
+          assert.deepEqual(record.takenUntil, new Date(0).toJSON());
           assert.equal(record.retries, 22);
         });
       });
@@ -236,8 +236,8 @@ suite('tasks', function() {
     setup(function() {
       deadlineTask = taskFactory();
       deadlineTask.state = 'running';
-      deadlineTask.deadline = new Date(0);
-      deadlineTask.takenUntil = new Date(2030, 1);
+      deadlineTask.deadline = new Date(0).toJSON();
+      deadlineTask.takenUntil = new Date(2030, 1).toJSON();
 
       return Tasks.create(deadlineTask);
     });
