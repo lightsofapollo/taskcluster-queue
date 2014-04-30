@@ -205,10 +205,25 @@ module.exports = mem(function(knex) {
         });
     }),
 
-    findAllWithRuns: function(query) {
+    findAll: function(query) {
       return taskJoinQuery().
         where(query).
         then(outgoingTasks);
+    },
+
+    /**
+    Find a single task matching the query (inclusive of runs).
+    */
+    findOne: function(query) {
+      // when we need to limit the number of results we need to do a nested
+      // query to first find all the taskIds that match the query then do a join
+      // to find all those rows with their tasks included.
+      return taskJoinQuery().
+        whereIn('tasks.taskId', function() {
+          this.select('taskId').from('tasks').where(query).limit(1);
+        }).
+        then(outgoingTasks).
+        then(first);
     },
 
     rerunTask: decorateDecodeSlug(function(taskId, retries) {

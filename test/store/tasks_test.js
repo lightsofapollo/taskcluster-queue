@@ -151,7 +151,34 @@ suite('tasks', function() {
     });
   });
 
-  suite('#findAllPendingByRun', function() {
+  suite('#findOne', function() {
+    var task;
+    setup(function() {
+      task = taskFactory();
+      task.provisionerId = 'foo';
+      task.workerType = 'type';
+      return Tasks.create(task).then(function() {
+        return Tasks.claim(task.taskId, new Date(), runFactory());
+      });
+    });
+
+    test('finding first task and its runs', function() {
+      var expected;
+
+      return Tasks.findBySlug(task.taskId).
+        then(function(_expected) {
+          expected = _expected;
+        }).
+        then(function() {
+          return Tasks.findOne({ provisionerId: task.provisionerId });
+        }).
+        then(function(record) {
+          assert.deepEqual(expected, record);
+        });
+    });
+  });
+
+  suite('#findAll', function() {
     var taskFoo;
     setup(function() {
       taskFoo = taskFactory();
@@ -171,7 +198,7 @@ suite('tasks', function() {
     });
 
     test('single result', function() {
-      return Tasks.findAllWithRuns({
+      return Tasks.findAll({
         provisionerId: 'bar'
       }).then(function(records) {
         assert.deepEqual(records[0], taskBar);
@@ -179,7 +206,7 @@ suite('tasks', function() {
     });
 
     test('find multiple', function() {
-      return Tasks.findAllWithRuns({
+      return Tasks.findAll({
         workerType: 'type'
       }).then(function(records) {
         var byId = mapByTaskId(records);
@@ -195,36 +222,36 @@ suite('tasks', function() {
         });
       });
     });
+  });
 
-    suite('#rerunTask', function() {
-      var task;
-      setup(function() {
-        task = taskFactory();
-        task.state = 'running';
-        return Tasks.create(task);
+  suite('#rerunTask', function() {
+    var task;
+    setup(function() {
+      task = taskFactory();
+      task.state = 'running';
+      return Tasks.create(task);
+    });
+
+    test('without a completed task', function() {
+      return Tasks.rerunTask(task.taskId, 22).then(function(record) {
+        assert.ok(!record, 'no task was updated for rerun');
       });
+    });
 
-      test('without a completed task', function() {
-        return Tasks.rerunTask(task.taskId, 22).then(function(record) {
-          assert.ok(!record, 'no task was updated for rerun');
-        });
-      });
+    test('with a completed task', function() {
+      var rerunTask;
 
-      test('with a completed task', function() {
-        var rerunTask;
+      return Tasks.completeTask(task.taskId).then(function() {
+        return Tasks.rerunTask(task.taskId, 22);
+      }).then(function(value) {
+        rerunTask = value;
+        return Tasks.findBySlug(task.taskId);
+      }).then(function(record) {
+        // returns the rerun task
+        assert.deepEqual(rerunTask, record);
 
-        return Tasks.completeTask(task.taskId).then(function() {
-          return Tasks.rerunTask(task.taskId, 22);
-        }).then(function(value) {
-          rerunTask = value;
-          return Tasks.findBySlug(task.taskId);
-        }).then(function(record) {
-          // returns the rerun task
-          assert.deepEqual(rerunTask, record);
-
-          assert.deepEqual(record.takenUntil, new Date(0).toJSON());
-          assert.equal(record.retries, 22);
-        });
+        assert.deepEqual(record.takenUntil, new Date(0).toJSON());
+        assert.equal(record.retries, 22);
       });
     });
   });
@@ -267,7 +294,7 @@ suite('tasks', function() {
             taskIdsOnly([retriesTask, deadlineTask])
           );
 
-          return Tasks.findAllWithRuns({ state: 'failed' });
+          return Tasks.findAll({ state: 'failed' });
         }).
         then(function(tasks) {
           var tasksById = mapByTaskId(tasks);
