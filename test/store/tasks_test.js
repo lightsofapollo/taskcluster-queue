@@ -79,7 +79,7 @@ suite('tasks', function() {
       var run = runFactory();
       var reclaimDate = new Date(2020, 1);
       return Tasks.claim(task.taskId, new Date(), run).then(function() {
-        return Tasks.findBySlugWithRuns(task.taskId);
+        return Tasks.findBySlug(task.taskId);
       }).then(function(task) {
         var createdRun = task.runs[0];
         return Tasks.claim(task.taskId, reclaimDate, createdRun);
@@ -96,7 +96,7 @@ suite('tasks', function() {
       return Tasks.claim(task.taskId, takenUntil, run).
         then(function(runId) {
           assert.equal(runId, 1);
-          return Tasks.findBySlugWithRuns(task.taskId);
+          return Tasks.findBySlug(task.taskId);
         }).
         then(function(taskWithRuns) {
           task.runs = [
@@ -185,8 +185,8 @@ suite('tasks', function() {
         var byId = mapByTaskId(records);
 
         return Promise.all([
-          Tasks.findBySlugWithRuns(taskFoo.taskId),
-          Tasks.findBySlugWithRuns(taskBar.taskId)
+          Tasks.findBySlug(taskFoo.taskId),
+          Tasks.findBySlug(taskBar.taskId)
         ]).then(function(list) {
           assert.deepEqual(
             byId,
@@ -217,7 +217,7 @@ suite('tasks', function() {
           return Tasks.rerunTask(task.taskId, 22);
         }).then(function(value) {
           rerunTask = value;
-          return Tasks.findBySlugWithRuns(task.taskId);
+          return Tasks.findBySlug(task.taskId);
         }).then(function(record) {
           // returns the rerun task
           assert.deepEqual(rerunTask, record);

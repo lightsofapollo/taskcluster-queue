@@ -134,14 +134,6 @@ module.exports = mem(function(knex) {
     }),
 
     findBySlug: decorateDecodeSlug(function(taskId) {
-      return knex('tasks').
-        where('taskId', taskId).
-        limit(1).
-        then(outgoingTasks).
-        then(first);
-    }),
-
-    findBySlugWithRuns: decorateDecodeSlug(function(taskId) {
       return taskJoinQuery().
         where('tasks.taskId', taskId).
         then(outgoingTasks).
@@ -236,7 +228,7 @@ module.exports = mem(function(knex) {
         then(function(count) {
           if (!count) return null;
           // yuck!
-          return this.findBySlugWithRuns(slugid.encode(taskId));
+          return this.findBySlug(slugid.encode(taskId));
         }.bind(this));
     }),
 
