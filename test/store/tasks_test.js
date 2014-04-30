@@ -20,6 +20,7 @@ suite('tasks', function() {
       "workerType":         "jonasfj-test-worker",
       "state":              "pending",
       "reason":             "none",
+      "runs":               [],
       "routing":            "jonasfjs-precious-tasks.stupid-test.aws",
       "retries":            0,
       "timeout":            60,

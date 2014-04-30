@@ -46,6 +46,7 @@ function mapTask(taskId, row) {
     return model;
   }, {});
   record.taskId = taskId;
+  record.runs = [];
   return record;
 }
 
@@ -73,8 +74,7 @@ function outgoingTasks(rows) {
     }
 
     if (row.runId) {
-      var runs = task.runs || (task.runs = []);
-      runs.push(mapRun(row));
+      task.runs.push(mapRun(row));
     }
 
     return tasks;
