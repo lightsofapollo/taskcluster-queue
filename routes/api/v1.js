@@ -10,30 +10,6 @@ var api = module.exports = new utils.API({
   limit:          '10mb'
 });
 
-/** Get the url to a prefix within the taskBucket */
-var task_bucket_url = function(prefix) {
-  // If taskBucket has a CNAME, we build a prettier URL:
-  if (nconf.get('queue:taskBucketIsCNAME') == 'true') {
-    return 'http://' + nconf.get('queue:taskBucket') + '/' + prefix;
-  }
-  return 'https://s3-' + nconf.get('aws:region') + '.amazonaws.com/' +
-          nconf.get('queue:taskBucket') + '/' + prefix;
-};
-
-/** Sign a url for upload to a bucket */
-var sign_put_url = function(options) {
-  return new Promise(function(accept, reject) {
-    s3.getSignedUrl('putObject', options, function(err, url) {
-      if(err) {
-        reject(err);
-      } else {
-        accept(url);
-      }
-    });
-  });
-};
-
-
 /** Create tasks */
 api.declare({
   method:   'post',
@@ -55,7 +31,7 @@ api.declare({
   var taskId = slugid.v4();
 
   // Task status structure to reply with in case of success
-  var taskStatus = {
+  var task = {
     taskId:               taskId,
     provisionerId:        req.body.provisionerId,
     workerType:           req.body.workerType,
@@ -68,7 +44,7 @@ api.declare({
     priority:             req.body.priority,
     created:              req.body.created,
     deadline:             req.body.deadline,
-    takenUntil:           (new Date(0)).toJSON()
+    takenUntil:           new Date(0).toJSON()
   };
 
   // Upload to S3, notice that the schema is validated by middleware
@@ -76,17 +52,17 @@ api.declare({
     taskId + '/task.json',
     req.body
   ).then(function() {
-    var taskInDb = Db.create(taskStatus);
+    var taskInDb = Db.create(task);
     var pendingEvent = Events.publish('task-pending', {
       version:    '0.2.0',
-      status:     taskStatus
+      status: task
     });
 
     return Promise.all([taskInDb, pendingEvent]);
 
   }).then(function() {
-    debug('new task', taskStatus);
-    return res.reply({ status: taskStatus });
+    debug('new task', task);
+    return res.reply({ status: task });
   });
 });
 
@@ -266,8 +242,8 @@ api.declare({
       timeout:              task.timeout,
       retries:              task.retries,
       priority:             task.priority,
-      created:              task.created,
-      deadline:             task.deadline,
+      created:              new Date(task.created),
+      deadline:             new Date(task.deadline),
       takenUntil:           (new Date(0)).toJSON()
     };
 
@@ -302,20 +278,20 @@ api.declare({
     "Get task status structure from `taskId`"
   ].join('\n')
 }, function(req, res) {
-  // Load task
-  var task_loaded = data.loadTask(req.params.taskId);
+  var Db = req.app.get('tasksStore');
 
-  // When loaded reply with task status structure, if found
-  return task_loaded.then(function(task_status) {
-    if (task_status) {
+  return Db.findBySlugWithRuns(req.params.taskId).
+    then(function(task) {
+      if (!task) {
+        res.json(404, {
+          message: "Task not found or already resolved"
+        });
+      }
+
       return res.reply({
-        status:     task_status
+        status: task
       });
-    }
-    res.json(404, {
-      message:      "Task not found or already resolved"
     });
-  });
 });
 
 
