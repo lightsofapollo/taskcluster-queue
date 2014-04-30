@@ -1,5 +1,6 @@
 var Promise = require('promise');
 var urlJoin = require('url-join');
+var debug = require('debug')('queue:taskBucket');
 
 function bucketConfig(tasks, input) {
   var config = {};
@@ -24,6 +25,7 @@ function Tasks(s3, bucket, publicHref) {
 Tasks.prototype = {
 
   get: function(path) {
+    debug('get item from bucket', path);
     return this.s3.getObject(bucketConfig(this, {
       Key: path
     })).promise().then(function(response) {
@@ -33,6 +35,7 @@ Tasks.prototype = {
   },
 
   put: function(path, object) {
+    debug('put item in bucket', path);
     return this.s3.putObject(bucketConfig(
       this,
       {

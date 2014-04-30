@@ -48,7 +48,7 @@ module.exports = function reaper(interval, Tasks, Events) {
   }
 
   function reap() {
-    return Promise.all([reapPending, reapFailed]);
+    return Promise.all([reapPending(), reapFailed()]);
   }
 
   /**

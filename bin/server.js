@@ -18,10 +18,23 @@ function launch(options) {
   app.use(express.favicon());
   app.use(express.logger('dev'));
 
+
   // task bucket
   var AWS = require('aws-sdk-promise');
+  var s3 = new AWS.S3(nconf.get('aws'));
+
+
   var TaskBucket = require('../queue/task_bucket');
-  app.set('taskBucket', new TaskBucket(new AWS.S3(nconf.get('aws'))));
+  app.set(
+    'taskBucket',
+    new TaskBucket(
+      s3,
+      nconf.get('queue:taskBucket'), // bucket location
+      nconf.get('queue:taskBucketIsCNAME') ?
+        nconf.get('queue:taskBucket') :
+        null
+    )
+  );
 
   // task database store
   var knex = require('knex').initialize({
@@ -140,7 +153,7 @@ function launch(options) {
       var reaper = require('../reaper')(
         nconf.get('queue:reaperInterval'),
         app.get('tasksStore'),
-        app.get('eventsStore')
+        app.get('events')
       );
 
       reaper.start();

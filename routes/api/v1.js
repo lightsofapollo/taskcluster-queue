@@ -1,17 +1,9 @@
-var nconf     = require('nconf');
 var utils     = require('./utils');
 var Promise   = require('promise');
-var aws       = require('aws-sdk-promise');
 var debug     = require('debug')('routes:api:0.2.0');
 var slugid    = require('../../utils/slugid');
 var validate  = require('../../utils/validate');
 var assert    = require('assert');
-
-var data    = require('../../queue/data');
-var events  = require('../../queue/events');
-
-// Create S3 instance
-var s3 = new aws.S3();
 
 /** API end-point for version v1/ */
 var api = module.exports = new utils.API({
@@ -55,11 +47,15 @@ api.declare({
     "structure, you can find the `taskId` in this structure, enjoy."
   ].join('\n')
 }, function(req, res) {
+  var Bucket = req.app.get('taskBucket');
+  var Db = req.app.get('tasksStore');
+  var Events = req.app.get('events');
+
   // Create task identifier
   var taskId = slugid.v4();
 
   // Task status structure to reply with in case of success
-  var task_status = {
+  var taskStatus = {
     taskId:               taskId,
     provisionerId:        req.body.provisionerId,
     workerType:           req.body.workerType,
@@ -76,37 +72,21 @@ api.declare({
   };
 
   // Upload to S3, notice that the schema is validated by middleware
-  var uploaded_to_s3 = s3.putObject({
-    Bucket:               nconf.get('queue:taskBucket'),
-    Key:                  taskId + '/task.json',
-    Body:                 JSON.stringify(req.body),
-    ContentType:          'application/json'
-  }).promise();
-
-  // When upload is completed
-  var done = uploaded_to_s3.then(function() {
-
-    // Insert into database
-    var added_to_database = data.createTask(task_status);
-
-    // Publish message through events
-    var event_published = events.publish('task-pending', {
+  return Bucket.put(
+    taskId + '/task.json',
+    req.body
+  ).then(function() {
+    var taskInDb = Db.create(taskStatus);
+    var pendingEvent = Events.publish('task-pending', {
       version:    '0.2.0',
-      status:     task_status
+      status:     taskStatus
     });
 
-    // Return a promise that everything happens
-    return Promise.all(added_to_database, event_published);
-  });
+    return Promise.all([taskInDb, pendingEvent]);
 
-  // Reply to request, when task is uploaded to s3, added to database and
-  // published over RabbitMQ
-  return done.then(function() {
-    debug('new task', task_status, { taskIdSlug: slugid.decode(taskId) });
-    // Reply that the task was inserted
-    return res.reply({
-      status: task_status
-    });
+  }).then(function() {
+    debug('new task', taskStatus);
+    return res.reply({ status: taskStatus });
   });
 });
 

@@ -4,10 +4,7 @@ suite('Post-Task Tests', function() {
   var assert      = require('assert');
   var Promise     = require('promise');
   var request     = require('superagent-promise');
-  var config      = require('../../config');
-  var nconf       = require('nconf');
-  var _           = require('lodash');
-  config.load();
+  var nconf       = require('../../config/test')();
 
   // Queue base URL
   var baseUrl     = 'http://' + nconf.get('server:hostname') + ':' +

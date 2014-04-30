@@ -2,6 +2,7 @@ var fork    = require('child_process').fork;
 var path    = require('path');
 var _       = require('lodash');
 var Promise = require('promise');
+var testDb  = require('./db');
 var debug   = require('debug')('LocalQueue');
 
 /** Wrapper for a process with a local queue, useful for testing */
@@ -11,44 +12,52 @@ var LocalQueue = function() {
 
 /** Launch the local queue instance as a subprocess */
 LocalQueue.prototype.launch = function() {
-  var that = this;
-  return new Promise(function(accept, reject) {
-    // Arguments for node.js
-    var args = [
-      '--database:dropTables'
-    ];
 
-    // Launch queue process
-    that.process = fork('server.js', args, {
-      env:      _.cloneDeep(process.env),
-      silent:   false,
-      cwd:      path.join(__dirname, '../')
-    });
+  // recreate the db
+  return testDb().then(function() {
+    return new Promise(function(accept, reject) {
+      // Arguments for node.js
+      var args = [
+        '--config',
+        'test',
+        'server'
+      ];
 
-    // Reject on exit
-    that.process.once('exit', reject);
+      var proc = this.process = fork(
+        './bin/queue',
+        args,
+        {
+          env: process.env,
+          silent: false,
+          cwd: __dirname + '/../'
+        }
+      );
 
-    // Message handler
-    var messageHandler = function(message) {
-      if (message.ready == true) {
+      // Reject on exit
+      proc.once('exit', reject);
+
+      // Message handler
+      var messageHandler = function(message) {
+        if (!message.ready) return;
+
         // Stop listening messages
-        that.process.removeListener('message', messageHandler);
+        proc.removeListener('message', messageHandler);
 
         // Stop listening for rejection
-        that.process.removeListener('exit', reject);
+        proc.removeListener('exit', reject);
 
         // Listen for early exits, these are bad
-        that.process.once('exit', that.onEarlyExit);
+        proc.once('exit', this.onEarlyExit);
 
         // Accept that the server started correctly
         debug("----------- LocalQueue Running --------------");
         accept();
-      }
-    };
+      }.bind(this);
 
-    // Listen for the started message
-    that.process.on('message', messageHandler);
-  });
+      // Listen for the started message
+      proc.on('message', messageHandler);
+    }.bind(this));
+  }.bind(this));
 };
 
 /** Handle early exits */
@@ -60,11 +69,11 @@ LocalQueue.prototype.onEarlyExit = function() {
 /** Terminate local queue instance */
 LocalQueue.prototype.terminate = function() {
   debug("----------- LocalQueue Terminated -----------");
-  if (this.process) {
-    this.process.removeListener('exit', this.onEarlyExit);
-    this.process.kill();
-    this.process = null;
-  }
+  if (!this.process) return;
+
+  this.process.removeListener('exit', this.onEarlyExit);
+  this.process.kill();
+  this.process = null;
 };
 
 // Export LocalQueue
