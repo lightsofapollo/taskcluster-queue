@@ -1,6 +1,7 @@
 var mem = require('memoizee');
 var slugid = require('slugid');
 var Promise = require('promise');
+var debug = require('debug')('queue:tasksStore');
 
 var TASK_FIELDS = [
   'taskId',
@@ -80,7 +81,7 @@ function outgoingTasks(rows) {
 
     var task = byTaskId[taskId];
     if (!task) {
-      task = mapTask(taskId, row);
+      task = byTaskId[taskId] = mapTask(taskId, row);
       tasks.push(task);
     }
 
@@ -141,6 +142,7 @@ module.exports = mem(function(knex) {
     }),
 
     claim: function(slug, takenUntil, run) {
+      debug('claim', slug, 'until', takenUntil);
       if (run.runId) {
         return this.refreshClaim(slug, takenUntil, run);
       }
@@ -148,6 +150,7 @@ module.exports = mem(function(knex) {
     },
 
     refreshClaim: decorateDecodeSlug(function(taskId, takenUntil, run) {
+      debug('refresh claim', taskId, takenUntil);
       return knex('tasks').
         update({
           takenUntil: takenUntil,
@@ -157,6 +160,7 @@ module.exports = mem(function(knex) {
     }),
 
     createClaim: decorateDecodeSlug(function(taskId, takenUntil, run) {
+      debug('create claim', taskId, takenUntil);
       return knex.transaction(function(t) {
         // attempt to acquire the task
         var markRunning = knex('tasks').

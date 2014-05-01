@@ -1,13 +1,11 @@
 suite('Test reruns', function() {
+
   var LocalQueue  = require('../localqueue');
   var debug       = require('debug')('rerun_test');
   var assert      = require('assert');
   var Promise     = require('promise');
   var request     = require('superagent-promise');
-  var config      = require('../../config');
-  var nconf       = require('nconf');
-  var _           = require('lodash');
-  config.load();
+  var nconf       = require('../../config/test')();
 
   // Queue base URL
   var baseUrl     = 'http://' + nconf.get('server:hostname') + ':' +
@@ -227,7 +225,3 @@ suite('Test reruns', function() {
     });
   });
 });
-
-
-
-
