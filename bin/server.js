@@ -1,8 +1,9 @@
-var program = require('commander');
+var debug = require('debug')('queue:server');
+
 var Promise = require('promise');
-var debug = require('debug')('server');
-var passport = require('passport');
 var AWS = require('aws-sdk-promise');
+
+var program = require('commander');
 var express = require('express');
 var path = require('path');
 var TaskBucket = require('../queue/task_bucket');
@@ -14,14 +15,8 @@ function launch(options) {
   require('../utils/spread-promise').patch();
 
   var app = exports.app = express();
-
   app.set('port', Number(process.env.PORT || nconf.get('server:port')));
-  app.set('views', path.join(__dirname, '..', 'views'));
-  app.set('view engine', 'jade');
   app.set('nconf', nconf);
-  app.use(express.favicon());
-  app.use(express.logger('dev'));
-
 
   // task bucket
   var s3 = new AWS.S3(nconf.get('aws'));
@@ -49,87 +44,12 @@ function launch(options) {
   require('../routes/api/v1').mount(app, '/v1');
 
   app.use(express.json());
-  app.use(express.urlencoded());
-  app.use(express.methodOverride());
-  app.use(express.cookieParser(nconf.get('server:cookieSecret')));
-  app.use(express.session());
-
-  app.use(passport.initialize());
-  app.use(passport.session());
-
-  app.use(function(req, res, next) {
-    // Expose user to all templates, if logged in
-    res.locals.user = req.user;
-    next();
-  });
   app.use(app.router);
-  app.use('/static', require('stylus').middleware(path.join(__dirname, '..', 'static')));
-  app.use('/static', express.static(path.join(__dirname, '..', 'static')));
-
-  // Warn if no secret was used in production
-  if ('production' == app.get('env')) {
-    var secret = nconf.get('server:cookieSecret');
-    if (secret == "Warn, if no secret is used on production") {
-      console.log("Warning: Customized cookie secret should be used in production");
-    }
-  }
 
   // Middleware for development
   if ('development' == app.get('env')) {
     app.use(express.errorHandler());
   }
-  // Passport configuration
-
-  var PersonaStrategy = require('passport-persona').Strategy;
-  passport.use(new PersonaStrategy({
-      audience: 'http://' + nconf.get('server:hostname') + ':' +
-                 nconf.get('server:port')
-    },
-    function(email, done) {
-      debug("Signed in with:" + email);
-      if (/@mozilla\.com$/.test(email)) {
-        done(null, {email: email});
-      } else {
-        done(null, null);
-      }
-    }
-  ));
-
-  // Serialize user to signed cookie
-  passport.serializeUser(function(user, done) {
-    done(null, user.email);
-  });
-
-  // Deserialize user from signed cookie
-  passport.deserializeUser(function(email, done) {
-    done(null, {email: email});
-  });
-
-  app.post('/persona-auth',
-    passport.authenticate('persona', {failureRedirect: '/unauthorized'}),
-    function(req, res) {
-      res.redirect('/');
-    }
-  );
-
-  app.get('/logout', function(req, res){
-    req.logout();
-    res.redirect('/');
-  });
-
-  /** Middleware for requiring authenticatoin */
-  var ensureAuthenticated = function(req, res, next) {
-    if (req.isAuthenticated()) {
-      return next();
-    }
-    res.redirect('/unauthorized');
-  };
-
-  // Route configuration
-  var routes = require('../routes');
-  app.get('/',                                routes.index);
-  app.get('/unauthorized',                    routes.unauthorized);
-
   // validate
   require('../utils/validate').setup();
 
