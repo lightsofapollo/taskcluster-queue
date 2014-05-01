@@ -34,7 +34,7 @@ suite('Test reruns', function() {
       provisionerId:    'jonasfj-provisioner',
       workerType:       'my-ami',
       routing:          'jonasfj-test.what-a-hack',
-      timeout:          30,
+      timeout:          60,
       retries:          5,
       priority:         1,
       created:          created.toJSON(),

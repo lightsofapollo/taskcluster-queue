@@ -31,7 +31,7 @@ api.declare({
   var taskId = slugid.v4();
 
   // Task status structure to reply with in case of success
-  var task = {
+  var taskStatus = {
     taskId:               taskId,
     provisionerId:        req.body.provisionerId,
     workerType:           req.body.workerType,
@@ -52,17 +52,17 @@ api.declare({
     taskId + '/task.json',
     req.body
   ).then(function() {
-    var taskInDb = Db.create(task);
+    var taskInDb = Db.create(taskStatus);
     var pendingEvent = Events.publish('task-pending', {
       version:    '0.2.0',
-      status: task
+      status: taskStatus
     });
 
     return Promise.all([taskInDb, pendingEvent]);
 
   }).then(function() {
-    debug('new task', task);
-    return res.reply({ status: task });
+    debug('new task', taskStatus);
+    return res.reply({ status: taskStatus });
   });
 });
 
@@ -105,9 +105,9 @@ api.declare({
   // Mapping from tasks to URLs
   var tasks = {};
 
-  var signature_promises = [];
-  while(signature_promises.length < tasksRequested) {
-    signature_promises.push((function() {
+  var signaturePromises = [];
+  while(signaturePromises.length < tasksRequested) {
+    signaturePromises.push((function() {
       var taskId = slugid.v4();
       return Bucket.signedPutUrl(
         taskId + '/task.json',
@@ -121,7 +121,7 @@ api.declare({
   }
 
   // When all signatures have been generated we
-  return Promise.all(signature_promises).then(function() {
+  return Promise.all(signaturePromises).then(function() {
     return res.reply({
       expires:  expires.toJSON(),
       tasks:    tasks
@@ -258,15 +258,15 @@ api.declare({
   var Db = req.app.get('tasksStore');
 
   return Db.findBySlug(req.params.taskId).
-    then(function(task) {
-      if (!task) {
+    then(function(taskStatus) {
+      if (!taskStatus) {
         res.json(404, {
           message: "Task not found or already resolved"
         });
       }
 
       return res.reply({
-        status: task
+        status: taskStatus
       });
     });
 });
@@ -351,11 +351,11 @@ api.declare({
     var replySent = Promise.all(
       logsUrlSigned,
       resultUrlSigned
-    ).spread(function(logs_url, result_url) {
+    ).spread(function(logsUrl, resultUrl) {
       return res.reply({
         runId:          runId,
-        logsPutUrl:     logs_url,
-        resultPutUrl:   result_url,
+        logsPutUrl:     logsUrl,
+        resultPutUrl:   resultUrl,
         status:         taskStatus
       });
     });
@@ -559,9 +559,9 @@ api.declare({
   };
 
   // When loaded let's pick a pending task
-  return Db.findOne(query).then(function(task) {
+  return Db.findOne(query).then(function(taskStatus) {
     // if there is no tasks available, report 204
-    if (!task) {
+    if (!taskStatus) {
       // Ask worker to sleep for 3 min before polling again
       res.json(204, {
         sleep:        3 * 60
@@ -570,7 +570,7 @@ api.declare({
     }
 
     // Pick the first task
-    var taskId = task.taskId;
+    var taskId = taskStatus.taskId;
 
     ///////////// Warning: Code duplication from /task/:taskId/claim
     /////////////          This needs to be refactored, all logic like this
@@ -579,7 +579,7 @@ api.declare({
 
     // Set takenUntil to now + 20 min
     var takenUntil = new Date();
-    var timeout = task.timeout;
+    var timeout = taskStatus.timeout;
     takenUntil.setSeconds(takenUntil.getSeconds() + timeout);
 
     // Claim task without runId if this is a new claim
@@ -599,7 +599,7 @@ api.declare({
         return;
       }
 
-      return Db.findBySlug(taskId).then(function(task) {
+      return Db.findBySlug(taskId).then(function(taskStatus) {
         // Load task status structure
         // Fire event
         var eventSent = Events.publish('task-running', {
@@ -608,7 +608,7 @@ api.declare({
           workerId:       workerId,
           runId:          runId,
           logsUrl:        Bucket.publicUrl(taskId + '/runs/' + runId + '/logs.json'),
-          status:         task
+          status:         taskStatus
         });
 
         // Sign urls for the reply
@@ -632,7 +632,7 @@ api.declare({
             runId:          runId,
             logsPutUrl:     urls[0],
             resultPutUrl:   urls[1],
-            status:         task
+            status:         taskStatus
           });
         });
 
@@ -683,25 +683,23 @@ api.declare({
   var gotResolution = Bucket.get(taskId + '/resolution.json');
 
   // Load task status from database
-  var gotStatus = Db.findBySlug(taskId).
-    catch(function() {
-      return false;
-    });
+  var gotStatus = Db.findBySlug(taskId);
 
   // When state is loaded check what to do
   return Promise.all(
     gotTask,
     gotResolution,
     gotStatus
-  ).spread(function(task, resolution, task) {
+  ).spread(function(task, resolution, taskStatus) {
     // Check that the task exists and have been scheduled before!
-    if (task === null) {
+    if (!task) {
       return res.json(400, {
         message:  "Task definition not uploaded and never scheuled!",
         error:    "Couldn't fetch: " + Bucket.publicUrl(taskId + '/task.json')
       });
     }
-    if (task === false && resolution === false) {
+
+    if (!taskStatus && !resolution) {
       return res.json(400, {
         message:  "This task have never been scheduled before, can't rerun it",
         error:    "There is no resolution or status for " + taskId
@@ -712,27 +710,27 @@ api.declare({
     var taskStatusPending = null;
 
     // If task was deleted from database we create it again
-    if (task === false) {
+    if (!taskStatus) {
       // Restore task status structure from resolution
-      task = resolution.status;
+      taskStatus = resolution.status;
 
       // Make the task pending again
-      task.state       = 'pending';
-      task.reason      = 'rerun-requested';
-      task.retries     = task.retries;
-      task.takenUntil  = (new Date(0)).toJSON();
+      taskStatus.state       = 'pending';
+      taskStatus.reason      = 'rerun-requested';
+      taskStatus.retries     = task.retries;
+      taskStatus.takenUntil  = (new Date(0)).toJSON();
 
       // Insert into database
-      taskStatusPending = Db.create(task).then(function() {
-        return task;
+      taskStatusPending = Db.create(taskStatus).then(function() {
+        return taskStatus;
       });
-    } else if (task.state == 'running' ||
-               task.state == 'pending') {
+    } else if (taskStatus.state == 'running' ||
+               taskStatus.state == 'pending') {
       // If the task isn't resolved, we do nothing letting this function be
       // idempotent
-      debug("Attempt to rerun a task with state: '%s' ignored", task.state);
+      debug("Attempt to rerun a task with state: '%s' ignored", taskStatus.state);
       return res.reply({
-        status: task
+        status: taskStatus
       });
     } else {
       debug('Rerun task');
@@ -741,18 +739,18 @@ api.declare({
     }
 
     // When task is pending again
-    return taskStatusPending.then(function(task) {
-      assert(task, "task cannot be null here!");
+    return taskStatusPending.then(function(taskStatus) {
+      assert(taskStatus, "task cannot be null here!");
 
       // Reply with created task status
       var sentReply = res.reply({
-        status: task
+        status: taskStatus
       });
 
       // Publish message through events
       var eventPublished = Events.publish('task-pending', {
         version:    '0.2.0',
-        status:     task
+        status:     taskStatus
       });
 
       return Promise.all(sentReply, eventPublished);
