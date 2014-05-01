@@ -51,14 +51,14 @@ Tasks.prototype = {
     )).promise();
   },
 
-  signedPutUrl: function(path, timeout) {
+  signedPutUrl: function(path, timeout, contentType) {
     var signedUrl = Promise.denodeify(this.s3.getSignedUrl.bind(this.s3));
 
     return signedUrl('putObject', bucketConfig(
       this,
       {
         Key: path,
-        ContentType: 'application/json',
+        ContentType: contentType || 'application/json',
         Expires: timeout
       }
     ));
