@@ -1,5 +1,5 @@
 var knex = require('knex');
-var schema = require('../store/schema');
+var schema = require('../queue/schema');
 var config = require('../config/test')();
 
 module.exports = function connect() {

@@ -1,13 +1,12 @@
 var debug = require('debug')('queue:server');
-
-var Promise = require('promise');
-var AWS = require('aws-sdk-promise');
-
 var program = require('commander');
 var express = require('express');
 var path = require('path');
-var TaskBucket = require('../queue/task_bucket');
-var TaskStore = require('../store/tasks');
+
+var Promise = require('promise');
+var AWS = require('aws-sdk-promise');
+var Bucket = require('../queue/bucket');
+var TasksStore = require('../queue/tasks_store');
 
 function launch(options) {
   var nconf = require(__dirname + '/../config/' + program.config)();
@@ -23,7 +22,7 @@ function launch(options) {
 
   app.set(
     'bucket',
-    new TaskBucket(
+    new Bucket(
       s3,
       nconf.get('queue:taskBucket'), // bucket location
       nconf.get('queue:taskBucketIsCNAME') ?
@@ -38,7 +37,7 @@ function launch(options) {
     connection: nconf.get('database:connectionString')
   });
 
-  app.set('db', TaskStore(knex));
+  app.set('db', TasksStore(knex));
 
   // routes
   require('../routes/api/v1').mount(app, '/v1');
@@ -60,7 +59,7 @@ function launch(options) {
     require('./utils/render-schema').publish() :
     null;
 
-  var schemaSetup = require('../store/schema').create(knex);
+  var schemaSetup = require('../queue/schema').create(knex);
 
   Promise.all([eventsSetup, publishSchema, schemaSetup]).
     then(function(setup) {

@@ -6,6 +6,4 @@
 
 ./node_modules/.bin/mocha \
   test/api/*.js \
-  test/queue/*.js \
-  test/store/*.js \
-  test/events_test.js
+  test/queue/*.js

@@ -1,11 +1,11 @@
 suite('queue/events', function() {
   var assert    = require('assert');
-  var nconf     = require('../config/test')();
+  var nconf     = require('../../config/test')();
   var amqp      = require('amqp');
   var Promise   = require('promise');
-  var events    = require('../queue/events');
+  var events    = require('../../queue/events');
   var debug     = require('debug')('tests:events');
-  var validate  = require('../utils/validate');
+  var validate  = require('../../utils/validate');
 
   var subject;
   setup(function() {

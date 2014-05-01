@@ -1,5 +1,5 @@
-suite('task bucket', function() {
-  var TaskBucket = require('../../queue/task_bucket');
+suite('queue/bucket', function() {
+  var Bucket = require('../../queue/bucket');
   var AWS = require('aws-sdk-promise');
 
   var assert = require('assert');
@@ -9,12 +9,12 @@ suite('task bucket', function() {
 
   var subject;
   setup(function() {
-    subject = new TaskBucket(s3, config.get('queue:taskBucket'));
+    subject = new Bucket(s3, config.get('queue:taskBucket'));
   });
 
   suite('#publicUrl', function() {
     test('with a host', function() {
-      var subject = new TaskBucket(
+      var subject = new Bucket(
         s3,
         'magicfoo',
         'https://things'
@@ -27,7 +27,7 @@ suite('task bucket', function() {
     });
 
     test('without a host', function() {
-      var subject = new TaskBucket(
+      var subject = new Bucket(
         s3,
         'magicfoo'
       );

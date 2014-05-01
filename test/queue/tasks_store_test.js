@@ -1,4 +1,4 @@
-suite('tasks', function() {
+suite('queue/tasks_store', function() {
   var Promise = require('promise');
   var slugid = require('slugid');
   var assert = require('assert');
@@ -38,7 +38,7 @@ suite('tasks', function() {
   setup(function() {
     return testDb().then(function(_knex) {
       knex = _knex;
-      Tasks = require('../../store/tasks')(knex);
+      Tasks = require('../../queue/tasks_store')(knex);
     });
   });
 
