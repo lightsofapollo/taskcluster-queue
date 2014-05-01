@@ -22,7 +22,7 @@ function launch(options) {
   var s3 = new AWS.S3(nconf.get('aws'));
 
   app.set(
-    'taskBucket',
+    'bucket',
     new TaskBucket(
       s3,
       nconf.get('queue:taskBucket'), // bucket location
@@ -38,7 +38,7 @@ function launch(options) {
     connection: nconf.get('database:connectionString')
   });
 
-  app.set('tasksStore', TaskStore(knex));
+  app.set('db', TaskStore(knex));
 
   // routes
   require('../routes/api/v1').mount(app, '/v1');
@@ -73,7 +73,7 @@ function launch(options) {
       // reaper to clean database every once and awhile
       var reaper = require('../reaper')(
         nconf.get('queue:reaperInterval'),
-        app.get('tasksStore'),
+        app.get('db'),
         app.get('events')
       );
 

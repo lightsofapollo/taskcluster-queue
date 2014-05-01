@@ -23,8 +23,8 @@ api.declare({
     "structure, you can find the `taskId` in this structure, enjoy."
   ].join('\n')
 }, function(req, res) {
-  var Bucket = req.app.get('taskBucket');
-  var Db = req.app.get('tasksStore');
+  var Bucket = req.app.get('bucket');
+  var Db = req.app.get('db');
   var Events = req.app.get('events');
 
   // Create task identifier
@@ -92,7 +92,7 @@ api.declare({
     "`/task/:taskId/schedule`."
   ].join('\n')
 }, function(req, res) {
-  var Bucket = req.app.get('taskBucket');
+  var Bucket = req.app.get('bucket');
   var Db = req.app.get('tasksDb');
 
   var tasksRequested = req.body.tasksRequested;
@@ -153,8 +153,8 @@ api.declare({
     "To reschedule a task previously resolved, use `/task/:taskId/rerun`."
   ].join('\n')
 }, function(req, res) {
-  var Db = req.app.get('tasksStore');
-  var Bucket = req.app.get('taskBucket');
+  var Db = req.app.get('db');
+  var Bucket = req.app.get('bucket');
   var Events = req.app.get('events');
 
   // Get taskId from parameter
@@ -255,7 +255,7 @@ api.declare({
     "Get task status structure from `taskId`"
   ].join('\n')
 }, function(req, res) {
-  var Db = req.app.get('tasksStore');
+  var Db = req.app.get('db');
 
   return Db.findBySlug(req.params.taskId).
     then(function(taskStatus) {
@@ -285,8 +285,8 @@ api.declare({
     "returns task status structure, runId, resultPutUrl and logsPutUrl"
   ].join('\n')
 }, function(req, res) {
-  var Db = req.app.get('tasksStore');
-  var Bucket = req.app.get('taskBucket');
+  var Db = req.app.get('db');
+  var Bucket = req.app.get('bucket');
   var Events = req.app.get('events');
 
   // Get input from request
@@ -382,8 +382,8 @@ api.declare({
   ].join('\n')
 }, function(req, res) {
 
-  var Db = req.app.get('tasksStore');
-  var Bucket = req.app.get('taskBucket');
+  var Db = req.app.get('db');
+  var Bucket = req.app.get('bucket');
 
   // Get input from posted JSON
   var taskId        = req.params.taskId;
@@ -460,8 +460,8 @@ api.declare({
     "Report task completed..."
   ].join('\n')
 }, function(req, res) {
-  var Db = req.app.get('tasksStore');
-  var Bucket = req.app.get('taskBucket');
+  var Db = req.app.get('db');
+  var Bucket = req.app.get('bucket');
   var Events = req.app.get('events');
 
   // Get input from posted JSON
@@ -542,8 +542,8 @@ api.declare({
     "your `workerType` claim work using `/v1/task/:taskId/claim`."
   ].join('\n')
 }, function(req, res) {
-  var Db = req.app.get('tasksStore');
-  var Bucket = req.app.get('taskBucket');
+  var Db = req.app.get('db');
+  var Bucket = req.app.get('bucket');
   var Events = req.app.get('events');
 
   // Get input
@@ -669,8 +669,8 @@ api.declare({
     "current task status."
   ].join('\n')
 }, function(req, res) {
-  var Db = req.app.get('tasksStore');
-  var Bucket = req.app.get('taskBucket');
+  var Db = req.app.get('db');
+  var Bucket = req.app.get('bucket');
   var Events = req.app.get('events');
 
   // Get taskId from parameter
@@ -773,7 +773,7 @@ api.declare({
     "**Warning** this api end-point is **not stable**."
   ].join('\n')
 }, function(req, res) {
-  var Db = req.app.get('tasksStore');
+  var Db = req.app.get('db');
   // Get input
   var provisionerId  = req.params.provisionerId;
 
