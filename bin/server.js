@@ -1,18 +1,22 @@
 var program = require('commander');
 var Promise = require('promise');
 var debug = require('debug')('server');
+var passport = require('passport');
+var AWS = require('aws-sdk-promise');
+var express = require('express');
+var path = require('path');
+var TaskBucket = require('../queue/task_bucket');
+var TaskStore = require('../store/tasks');
 
 function launch(options) {
   var nconf = require(__dirname + '/../config/' + program.config)();
 
   require('../utils/spread-promise').patch();
 
-  var express = require('express');
   var app = exports.app = express();
 
-  var path = require('path');
   app.set('port', Number(process.env.PORT || nconf.get('server:port')));
-  app.set('views', path.join(__dirname, 'views'));
+  app.set('views', path.join(__dirname, '..', 'views'));
   app.set('view engine', 'jade');
   app.set('nconf', nconf);
   app.use(express.favicon());
@@ -20,11 +24,8 @@ function launch(options) {
 
 
   // task bucket
-  var AWS = require('aws-sdk-promise');
   var s3 = new AWS.S3(nconf.get('aws'));
 
-
-  var TaskBucket = require('../queue/task_bucket');
   app.set(
     'taskBucket',
     new TaskBucket(
@@ -42,8 +43,7 @@ function launch(options) {
     connection: nconf.get('database:connectionString')
   });
 
-  var tasksStore = require('../store/tasks');
-  app.set('tasksStore', tasksStore(knex));
+  app.set('tasksStore', TaskStore(knex));
 
   // routes
   require('../routes/api/v1').mount(app, '/v1');
@@ -53,14 +53,18 @@ function launch(options) {
   app.use(express.methodOverride());
   app.use(express.cookieParser(nconf.get('server:cookieSecret')));
   app.use(express.session());
+
+  app.use(passport.initialize());
+  app.use(passport.session());
+
   app.use(function(req, res, next) {
     // Expose user to all templates, if logged in
     res.locals.user = req.user;
     next();
   });
   app.use(app.router);
-  app.use('/static', require('stylus').middleware(path.join(__dirname, 'static')));
-  app.use('/static', express.static(path.join(__dirname, 'static')));
+  app.use('/static', require('stylus').middleware(path.join(__dirname, '..', 'static')));
+  app.use('/static', express.static(path.join(__dirname, '..', 'static')));
 
   // Warn if no secret was used in production
   if ('production' == app.get('env')) {
@@ -75,11 +79,8 @@ function launch(options) {
     app.use(express.errorHandler());
   }
   // Passport configuration
-  var passport = require('passport');
-  app.use(passport.initialize());
-  app.use(passport.session());
 
-  var PersonaStrategy                 = require('passport-persona').Strategy;
+  var PersonaStrategy = require('passport-persona').Strategy;
   passport.use(new PersonaStrategy({
       audience: 'http://' + nconf.get('server:hostname') + ':' +
                  nconf.get('server:port')
