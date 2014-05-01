@@ -829,6 +829,6 @@ api.declare({
   ].join('\n')
 }, function(req, res) {
   return res.reply({
-    url:  nconf.get('amqp:url')
+    url:  req.app.get('nconf').get('amqp:url')
   });
 });
