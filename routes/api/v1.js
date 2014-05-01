@@ -381,16 +381,25 @@ api.declare({
     "Get artifact-urls for posted artifact urls..."
   ].join('\n')
 }, function(req, res) {
+
+  var Db = req.app.get('tasksStore');
+  var Bucket = req.app.get('taskBucket');
+
   // Get input from posted JSON
   var taskId        = req.params.taskId;
   var runId         = req.body.runId;
   var artifacts     = req.body.artifacts;
-  var artifact_list = Object.keys(artifacts);
+  var artifactList  = Object.keys(artifacts);
 
   // Load task
-  var task_loaded = data.loadTask(taskId);
+  var taskLoaded = Db.findBySlug(taskId);
 
   // Let urls timeout after 20 min
+  // XXX: Timeouts for the run artifacts are a big race condition at best and a
+  //      lot of extra complexity at worst for the reclaims... If a task we
+  //      thought timed out somehow pushes artifacts to a particular run this is
+  //      unlikely and not a big deal. Losing runs that where successful but
+  //      could not push artifacts are expensive (and probably mysterious).
   var timeout = 20 * 60;
   var expires = new Date();
   expires.setSeconds(expires.getSeconds() + timeout);
@@ -398,39 +407,38 @@ api.declare({
   debug("Signing URLs for artifacts: %j", artifacts);
 
   // Get signed urls
-  var urls_signed = artifact_list.map(function(artifact) {
-    return sign_put_url({
-      Bucket:         nconf.get('queue:taskBucket'),
-      Key:            taskId + '/runs/' + runId + '/artifacts/' + artifact,
-      ContentType:    artifacts[artifact].contentType,
-      Expires:        timeout
-    });
+  var urlsSigned = artifactList.map(function(artifact) {
+    return Bucket.signedPutUrl(
+      taskId + '/runs/' + runId + '/artifacts/' + artifact,
+      timeout,
+      artifacts[artifact].contentType
+    );
   });
 
   // Create a JSON object from signed urls
-  var artifact_urls = Promise.all(urls_signed).then(function(signed_urls) {
+  var artifactUrls = Promise.all(urlsSigned).then(function(signedUrls) {
     var artifactPrefix = taskId + '/runs/' + runId + '/artifacts/';
-    var url_map = {};
-    artifact_list.forEach(function(artifact, index) {
-      url_map[artifact] = {
-        artifactPutUrl:       signed_urls[index],
-        artifactUrl:          task_bucket_url(artifactPrefix + artifact),
+    var urlMap = {};
+    artifactList.forEach(function(artifact, index) {
+      urlMap[artifact] = {
+        artifactPutUrl:       signedUrls[index],
+        artifactUrl:          Bucket.publicUrl(artifactPrefix + artifact),
         contentType:          artifacts[artifact].contentType
       };
     });
-    return url_map;
+    return urlMap;
   });
 
   // When loaded reply with task status structure, if found
   return Promise.all(
-    task_loaded,
-    artifact_urls
-  ).spread(function(taskStatus, url_map) {
+    taskLoaded,
+    artifactUrls
+  ).spread(function(taskStatus, urlMap) {
     if (taskStatus) {
       return res.reply({
         status:           taskStatus,
         expires:          expires.toJSON(),
-        artifacts:        url_map
+        artifacts:        urlMap
       });
     }
     res.json(404, {
@@ -771,10 +779,10 @@ api.declare({
   var provisionerId  = req.params.provisionerId;
 
   // Load pending tasks
-  var task_loaded = data.queryTasks(provisionerId);
+  var taskLoaded = data.queryTasks(provisionerId);
 
   // When loaded reply
-  task_loaded.then(function(tasks) {
+  taskLoaded.then(function(tasks) {
     return res.reply({
       tasks: tasks
     });
