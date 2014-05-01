@@ -16,7 +16,7 @@ suite('claim timeouts', function() {
   });
 
   teardown(function() {
-    queue.terminate();
+    return queue.terminate();
   });
 
   // break all rules that have ever existed...
@@ -74,7 +74,7 @@ suite('claim timeouts', function() {
     }
 
     var body;
-    setup(function(done) {
+    setup(function() {
       return request('POST', baseUrl + '/v1/task/new').
         send(task).
         end().

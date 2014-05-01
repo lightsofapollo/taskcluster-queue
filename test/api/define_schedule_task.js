@@ -17,7 +17,7 @@ suite('Test reruns', function() {
   });
 
   teardown(function() {
-    queue.terminate();
+    return queue.terminate();
   });
 
   /** Test define tasks */

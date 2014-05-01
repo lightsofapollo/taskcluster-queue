@@ -16,7 +16,7 @@ suite('Post-Task Tests', function() {
   });
 
   teardown(function() {
-    queue.terminate();
+    return queue.terminate();
   });
 
   /** Test task publication */

@@ -16,7 +16,7 @@ suite('/task/:taskId/artifact-urls', function() {
   });
 
   teardown(function() {
-    queue.terminate();
+    return queue.terminate();
   });
 
   // first we need a task to actually post artifact to

@@ -1,6 +1,5 @@
 var fork    = require('child_process').fork;
 var path    = require('path');
-var _       = require('lodash');
 var Promise = require('promise');
 var testDb  = require('./db');
 var debug   = require('debug')('LocalQueue');
@@ -69,11 +68,17 @@ LocalQueue.prototype.onEarlyExit = function() {
 /** Terminate local queue instance */
 LocalQueue.prototype.terminate = function() {
   debug("----------- LocalQueue Terminated -----------");
-  if (!this.process) return;
+  if (!this.process) return Promise.from(null);
 
-  this.process.removeListener('exit', this.onEarlyExit);
-  this.process.kill();
-  this.process = null;
+
+  return new Promise(function(accept) {
+    var proc = this.process;
+    this.process.removeListener('exit', this.onEarlyExit);
+    this.process.kill();
+    this.process = null;
+
+    proc.once('exit', accept);
+  }.bind(this));
 };
 
 // Export LocalQueue
