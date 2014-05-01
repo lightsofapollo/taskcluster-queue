@@ -1,7 +1,7 @@
 var utils     = require('./utils');
 var Promise   = require('promise');
 var debug     = require('debug')('routes:api:0.2.0');
-var slugid    = require('../../utils/slugid');
+var slugid    = require('slugid');
 var validate  = require('../../utils/validate');
 var assert    = require('assert');
 
