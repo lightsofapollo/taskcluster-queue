@@ -773,11 +773,14 @@ api.declare({
     "**Warning** this api end-point is **not stable**."
   ].join('\n')
 }, function(req, res) {
+  var Db = req.app.get('tasksStore');
   // Get input
   var provisionerId  = req.params.provisionerId;
 
   // Load pending tasks
-  var taskLoaded = data.queryTasks(provisionerId);
+  var taskLoaded = Db.findAll({
+    provisionerId: provisionerId
+  });
 
   // When loaded reply
   taskLoaded.then(function(tasks) {
