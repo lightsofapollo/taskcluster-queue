@@ -46,6 +46,13 @@ suite('task bucket', function() {
     });
   });
 
+  test('get with 404', function() {
+    // NoSuchKey error should not throw
+    return subject.get('wtfwhyisthishere').then(function(value) {
+      assert.ok(!value);
+    });
+  });
+
   test('#get/put', function() {
     var obj = { woot: true };
     var path = slugid.v4() + '-from-a-test';

@@ -26,12 +26,17 @@ Tasks.prototype = {
 
   get: function(path) {
     debug('get item from bucket', path);
-    return this.s3.getObject(bucketConfig(this, {
-      Key: path
-    })).promise().then(function(response) {
-      var data = response.data.Body.toString('utf8');
-      return JSON.parse(data);
-    });
+    var config = bucketConfig(this, { Key: path });
+    return this.s3.getObject(config).
+      promise().
+      then(function(response) {
+        var data = response.data.Body.toString('utf8');
+        return JSON.parse(data);
+      }).
+      catch(function(err) {
+        if (err.code === 'NoSuchKey') return null;
+        throw err;
+      });
   },
 
   put: function(path, object) {

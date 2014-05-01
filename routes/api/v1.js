@@ -92,6 +92,9 @@ api.declare({
     "`/task/:taskId/schedule`."
   ].join('\n')
 }, function(req, res) {
+  var Bucket = req.app.get('taskBucket');
+  var Db = req.app.get('tasksDb');
+
   var tasksRequested = req.body.tasksRequested;
 
   // Set expires to now + 20 min
@@ -106,14 +109,12 @@ api.declare({
   while(signature_promises.length < tasksRequested) {
     signature_promises.push((function() {
       var taskId = slugid.v4();
-      return sign_put_url({
-        Bucket:         nconf.get('queue:taskBucket'),
-        Key:            taskId + '/task.json',
-        ContentType:    'application/json',
-        Expires:        timeout
-      }).then(function(url) {
+      return Bucket.signedPutUrl(
+        taskId + '/task.json',
+        timeout
+      ).then(function(url) {
         tasks[taskId] = {
-          taskPutUrl:     url
+          taskPutUrl: url
         };
       });
     })());
@@ -152,55 +153,30 @@ api.declare({
     "To reschedule a task previously resolved, use `/task/:taskId/rerun`."
   ].join('\n')
 }, function(req, res) {
+  var Db = req.app.get('tasksStore');
+  var Bucket = req.app.get('taskBucket');
+  var Events = req.app.get('events');
+
   // Get taskId from parameter
   var taskId = req.params.taskId;
 
-  // Load task.json
-  var gotTask = s3.getObject({
-    Bucket:               nconf.get('queue:taskBucket'),
-    Key:                  taskId + '/task.json'
-  }).promise().then(function(response) {
-    var data = response.data.Body.toString('utf8');
-    return JSON.parse(data);
-  }, function(err) {
-    if (err.code == 'NoSuchKey') {
-      return null;
-    }
-    debug("Failed to get task.json for taskId: %s with error: %s, as JSON: %j",
-          err, err, err.stack);
-    throw err;
-  });
-
-  // Check for resolution
-  var gotResolution = s3.getObject({
-    Bucket:               nconf.get('queue:taskBucket'),
-    Key:                  taskId + '/resolution.json'
-  }).promise().then(function(response) {
-    var data = response.data.Body.toString('utf8');
-    return JSON.parse(data);
-  }, function(err) {
-    if (err.code == 'NoSuchKey') {
-      return null;
-    }
-    debug("Failed to get resolution for taskId: %s with error: %s, as JSON: %j",
-          err, err, err.stack);
-    throw err;
-  });
+  var gotTask = Bucket.get(taskId + '/task.json');
+  var gotResolution = Bucket.get(taskId + '/resolution.json');
 
   // Load task status from database
-  var gotStatus = data.loadTask(taskId);
+  var gotStatus = Db.findBySlug(taskId);
 
   // When state is loaded check what to do
   return Promise.all(
     gotTask,
     gotResolution,
     gotStatus
-  ).spread(function(task, resolution, task_status) {
+  ).spread(function(task, resolution, taskStatus) {
     // If task wasn't present on S3 then that is a problem too
     if (task === null) {
       return res.json(400, {
         message:  "Task definition not uploaded!",
-        error:    "Couldn't fetch: " + task_bucket_url(taskId + '/task.json')
+        error:    "Couldn't fetch: " + Bucket.publicUrl(taskId + '/task.json')
       });
     }
 
@@ -208,14 +184,15 @@ api.declare({
     // can't be scheduled. But for simplicity we let this operation be
     // idempotent, hence, we just ignore the request to schedule the task, and
     // return the latest task status
-    if (task_status !== null) {
+    if (taskStatus) {
       return res.reply({
-        status:     task_status
+        status: taskStatus
       });
     }
-    if (resolution !== null) {
+
+    if (resolution) {
       return res.reply({
-        status:     resolution.status
+        status: resolution.status
       });
     }
 
@@ -231,7 +208,7 @@ api.declare({
     }
 
     // Task status structure to reply with in case of success
-    task_status = {
+    taskStatus = {
       taskId:               taskId,
       provisionerId:        task.provisionerId,
       workerType:           task.workerType,
@@ -242,25 +219,25 @@ api.declare({
       timeout:              task.timeout,
       retries:              task.retries,
       priority:             task.priority,
-      created:              new Date(task.created),
-      deadline:             new Date(task.deadline),
-      takenUntil:           (new Date(0)).toJSON()
+      created:              new Date(task.created).toJSON(),
+      deadline:             new Date(task.deadline).toJSON(),
+      takenUntil:           new Date(0).toJSON()
     };
 
     // Insert into database
-    var added_to_database = data.createTask(task_status);
+    var addedToDatabase = Db.create(taskStatus);
 
     // Publish message through events
-    var eventPublished = events.publish('task-pending', {
+    var eventPublished = Events.publish('task-pending', {
       version:    '0.2.0',
-      status:     task_status
+      status:     taskStatus
     });
 
     // Return a promise that everything happens
-    return Promise.all(added_to_database, eventPublished).then(function() {
+    return Promise.all(addedToDatabase, eventPublished).then(function() {
       // Reply with created task status
       return res.reply({
-        status:   task_status
+        status:   taskStatus
       });
     });
   });
@@ -322,8 +299,8 @@ api.declare({
   var timeout;
 
   return Db.findBySlug(taskId).then(function(status) {
-    task_status = status;
-    timeout = task_status.timeout;
+    taskStatus = status;
+    timeout = taskStatus.timeout;
 
     // Set takenUntil to now + 20 min
     var takenUntil = new Date();
@@ -354,7 +331,7 @@ api.declare({
         workerId:     workerId,
         runId:        runId,
         logsUrl:      Bucket.publicUrl(taskId + '/runs/' + runId + '/logs.json'),
-        status:       task_status
+        status:       taskStatus
       });
     }
 
@@ -379,7 +356,7 @@ api.declare({
         runId:          runId,
         logsPutUrl:     logs_url,
         resultPutUrl:   result_url,
-        status:         task_status
+        status:         taskStatus
       });
     });
 
@@ -448,10 +425,10 @@ api.declare({
   return Promise.all(
     task_loaded,
     artifact_urls
-  ).spread(function(task_status, url_map) {
-    if (task_status) {
+  ).spread(function(taskStatus, url_map) {
+    if (taskStatus) {
       return res.reply({
-        status:           task_status,
+        status:           taskStatus,
         expires:          expires.toJSON(),
         artifacts:        url_map
       });
