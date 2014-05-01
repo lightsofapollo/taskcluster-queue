@@ -32,7 +32,7 @@ exports.create = function(knex) {
           t.integer('runId').notNullable();
           t.string('workerGroup', 22).notNullable();
           t.string('workerId', 22).notNullable();
-          t.primary(['taskId', 'workerId']);
+          t.primary(['runId', 'taskId']);
         }).transacting(t);
       });
 

@@ -1,7 +1,7 @@
 suite('Test reruns', function() {
 
-  var LocalQueue  = require('../localqueue');
   var debug       = require('debug')('rerun_test');
+  var LocalQueue  = require('../localqueue');
   var assert      = require('assert');
   var Promise     = require('promise');
   var request     = require('superagent-promise');
