@@ -308,6 +308,10 @@ api.declare({
     "returns task status structure, runId, resultPutUrl and logsPutUrl"
   ].join('\n')
 }, function(req, res) {
+  var Db = req.app.get('tasksStore');
+  var Bucket = req.app.get('taskBucket');
+  var Events = req.app.get('events');
+
   // Get input from request
   var workerGroup     = req.body.workerGroup;
   var workerId        = req.body.workerId;
@@ -317,7 +321,7 @@ api.declare({
   var taskStatus;
   var timeout;
 
-  return data.loadTask(taskId).then(function(status) {
+  return Db.findBySlug(taskId).then(function(status) {
     task_status = status;
     timeout = task_status.timeout;
 
@@ -326,14 +330,14 @@ api.declare({
     takenUntil.setSeconds(takenUntil.getSeconds() + timeout);
 
     // Claim task without runId if this is a new claim
-    return data.claimTask(taskId, takenUntil, {
+    return Db.claim(taskId, takenUntil, {
       workerGroup:    workerGroup,
       workerId:       workerId,
       runId:          requestedRunId || undefined
     });
   }).then(function(runId) {
     // If task wasn't claimed, report 404
-    if(runId === null) {
+    if (!runId) {
       res.json(404, {
         message: "Task not found, or already taken"
       });
@@ -344,31 +348,27 @@ api.declare({
     var eventSent = Promise.from(null);
     if (requestedRunId !== runId) {
       // Fire event
-      eventSent = events.publish('task-running', {
+      eventSent = Events.publish('task-running', {
         version:      '0.2.0',
         workerGroup:  workerGroup,
         workerId:     workerId,
         runId:        runId,
-        logsUrl:      task_bucket_url(taskId + '/runs/' + runId + '/logs.json'),
+        logsUrl:      Bucket.publicUrl(taskId + '/runs/' + runId + '/logs.json'),
         status:       task_status
       });
     }
 
     // Sign urls for the reply
-    var logsUrlSigned = sign_put_url({
-      Bucket:         nconf.get('queue:taskBucket'),
-      Key:            taskId + '/runs/' + runId + '/logs.json',
-      ContentType:    'application/json',
-      Expires:        timeout
-    });
+    var logsUrlSigned = Bucket.signedPutUrl(
+      taskId + '/runs/' + runId + '/logs.json',
+      timeout
+    );
 
     // Sign url for uploading task result
-    var resultUrlSigned = sign_put_url({
-      Bucket:         nconf.get('queue:taskBucket'),
-      Key:            taskId + '/runs/' + runId + '/result.json',
-      ContentType:    'application/json',
-      Expires:        timeout
-    });
+    var resultUrlSigned = Bucket.signedPutUrl(
+      taskId + '/runs/' + runId + '/result.json',
+      timeout
+    );
 
     // Send reply client
     var replySent = Promise.all(
@@ -607,7 +607,7 @@ api.declare({
     // When claimed
     return taskClaimed.then(function(runId) {
       // If task wasn't claimed, report 404
-      if(runId === null) {
+      if (!runId) {
         res.json(404, {
           message: "Task not found, or already taken"
         });
@@ -615,7 +615,6 @@ api.declare({
       }
 
       return Db.findBySlug(taskId).then(function(task) {
-        console.log('second find by slug', task);
         // Load task status structure
         // Fire event
         var eventSent = Events.publish('task-running', {
